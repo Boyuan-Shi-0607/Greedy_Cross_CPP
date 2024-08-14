@@ -1,7 +1,7 @@
 #ifndef GREEDY_CROSS_CPP_GREEDY_CROSS_H
 #define GREEDY_CROSS_CPP_GREEDY_CROSS_H
 #include <iostream>
-#include "sweep.h"
+#include "maxvol.h"
 #include <random>
 #include <tuple>
 #include "../utility/info.h"
@@ -50,67 +50,62 @@ cross_data greedy_cross(const std::function<double(std::vector<int>)>& func) {
 		for (const std::vector<int> &i: I[alpha]) {
 			for (const std::vector<int> &j: J[alpha]) {
 				if (std::abs(func(concatenateVectors(i, j))) < std::pow(10, -12)) {
-					throw std::runtime_error("Initial rank-1 choice leads to singular 1 * 1 pivot matrices.");
+					throw std::runtime_error("Initial rank-1 choice leads to "
+											 "singular 1 * 1 pivot matrices.");
 				}
 			}
 		}
-	}
-	
-	std::vector<Eigen::MatrixXd> inverse_pivot_matrix;
-	for (int alpha=0; alpha<dim.size()-1;++alpha) {
-		Eigen::MatrixXd inv_p_mat_alpha(1, 1);
-		inv_p_mat_alpha(0, 0) = std::pow(func(concatenateVectors(I[alpha][0], J[alpha][0])), -1);
-		inverse_pivot_matrix.push_back(inv_p_mat_alpha);
 	}
 	
 	int i = 0;
 	while (i < n_swp) {
 		auto start = start_timing();
 		
+		int counter = 0;
 		// forward sweep
 		for (int alpha=0; alpha<dim.size()-1;++alpha) {
-			eps[alpha] = sweep(I, J, alpha, func,
-							   tol[alpha],
-							   inverse_pivot_matrix[alpha]);
+			eps[alpha] = maxvol(func, alpha, I, J, tol[alpha]);
 		}
 		
 		// backward sweep
 		for (int alpha=static_cast<int>(dim.size())-2; alpha>=0;--alpha) {
-			eps[alpha] = sweep(I, J, alpha, func,
-							   tol[alpha],
-							   inverse_pivot_matrix[alpha]);
+			eps[alpha] = maxvol(func, alpha, I, J, tol[alpha]);
+			if (eps[alpha] < tol[alpha]) {
+				counter += 1;
+			}
 		}
-		
 		if (verbose) {
-			std::cout << "------------------------------------" << std::endl;
+			std::cout << "---------------------------------------" << std::endl;
 			end_timing(start, "sweep " + std::to_string(i), "s");
-		}
-		if (verbose) {
 			std::cout << "number of sweeps " << i+1 << std::endl;
 			std::vector<int> remaining_node;
 			std::vector<double> remaining_eps;
-			std::vector<int> remaining_rank;
 			std::vector<int> ranks;
 			for (int alpha=0;alpha<dim.size()-1;++alpha) {
 				if (eps[alpha] > tol[alpha]) {
 					remaining_node.push_back(alpha);
 					remaining_eps.push_back(eps[alpha]);
-					remaining_rank.push_back(static_cast<int>(I[alpha].size()));
 				}
 			}
 			ranks.reserve(I.size());
 			for (const auto & item : I) {
 				ranks.push_back(static_cast<int>(item.size()));
 			}
+			info_scalar("total number of nodes: ", static_cast<int>(dim.size())-1);
 			info_vec("max_dx: ", eps);
 			info_vec("ranks: ", ranks);
-			info_scalar("total number of nodes: ", static_cast<int>(dim.size())-1);
-			info_scalar("number of remaining nodes: ", static_cast<int>(remaining_node.size()));
-			info_vec("remaining nodes: ", remaining_node);
-			info_vec("remaining eps: ", remaining_eps);
-			info_vec("remaining ranks: ", remaining_rank);
-			std::cout << "------------------------------------" << std::endl;
+			if (not remaining_node.empty()) {
+				info_scalar("number of remaining nodes: ", static_cast<int>(remaining_node.size()));
+				info_vec("remaining nodes: ", remaining_node);
+				info_vec("remaining eps: ", remaining_eps);
+			}
 		}
+		
+		if (counter == dim.size()-1) {
+			std::cout << "Sweep finished. Tol achieved." << std::endl;
+			break;
+		}
+		
 		++i;
 	}
 	return cross_data{I, J, eps};
