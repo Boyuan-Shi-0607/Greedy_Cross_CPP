@@ -7,9 +7,11 @@
 template <typename T1>
 void info_vec(const std::string& information, const T1& data) {
 	std::cout << information << " ";
-	for (const auto& element : data) {
-		std::cout << element << " ";
+	size_t num = data.size();
+	for (int i=0; i<num-1;++i) {
+		std::cout << data[i] << ", ";
 	}
+	std::cout << data[num-1] << " ";
 	std::cout << std::endl;
 }
 
