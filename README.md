@@ -1,4 +1,4 @@
-Implementation of greedy-cross algorithm in c++. 
+Implementation of greedy-cross algorithm in C++. 
 
 A brief introduction is in `introduction.pdf`
 
